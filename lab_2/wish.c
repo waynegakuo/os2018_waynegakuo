@@ -4,128 +4,67 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define BUFF_SIZE 32
 
-//declaring the functions for the builtin commands
-int exit_cmd(char **args);
-int cd_cmd(char **args);
-//int path_cmd (char **args);
+int main(){
+	char *line;  //get command line
+    	char* argv[100];        //user command
+    	char* path= "/bin/";    //set path at bin
+    	char progpath[20];      //full file path
+    	int argc;               //arg count
+	size_t buffsize=32;
+	size_t characters;
+	const char * exit_cmd="exit";
+	while(1){
 
-//a list containing the built in commands
-char *builtin_cmds[]={
-	"exit",
-	"cd",
-	//"path"
-};
+    		printf("wish> ");
+		line=(char *)malloc(buffsize * sizeof(char));
+		characters=getline(&line, &buffsize, stdin);
+		printf("You typed: '%s'", line);
+		//char y=line[0];
+ 		//if (strstr(const (line[0]), exit_cmd)==0){
+		//	exit(0);
+		//}
 
-//functions of the commands corresponding to their names put in the list
-int (*builtin_fn[])(char **)={
-	&exit_cmd,
-	&cd_cmd,
-	//&path_cmd
-};
 
-int builtin_len(){
-	return sizeof(builtin_cmds)/sizeof(char *);
-}
-
-//exit command
-int exit_cmd(char **args){
-	return 0;
-}
-
-//changing directory command
-int cd_cmd(char **args){
-	if (args[1]==NULL){
-		fprintf(stderr, "kindly provide directory to \"cd\"\n");
-	}
-	else {
-		if (chdir(args[1])!=0){
-			perror("lsh");
+		char *token;
+		int argc; //taking argument count
+		token= strtok(line, " ");
+		int i=0;
+		char **argv= malloc (100 * sizeof(char*)); //storing tokens into array of pointers of pointers
+		while (token!=NULL){
+			argv[i]=token;
+			token=strtok(NULL, " ");
+			i++;
 		}
-	}
-	return 1;
-}
+		argv[i]=NULL;
+		argc=i;
 
-int launch_shell (char **args){
-	pid_t pid, wait_pid; //process ids
-	int status;
-
-	pid=fork();
-	if (pid==0){ //child process
-		if (execv(args[0], args)==-1){
-			perror("execv failed");
+		for (i=0; i<argc; i++){
+			if(strcmp(argv[i], "exit")==0){
+				printf("Exit fam");
+			}
+			printf("%s\n", argv[i]);
 		}
-	exit(EXIT_FAILURE);
 
-	}
-	else if (pid>0){ //parent process
-		if ((pid=wait(&status))<0){
-			perror("wait");
-			_exit(1);
+		pid_t pid, wpid;
+		int status;
+
+		pid=fork();
+		if (pid=0){
+			if (execv(argv[0], argv)==-1){
+				perror("lsh");
+			}
+			exit(1);
 		}
-		printf("Parent: finished\n");
-	}
-	else {
-		perror("fork failed");
-	}
-	return 0; //returns success
-}
-
-//executes program baased on builtin commands else launches the shell commands provided by user
-int exec_prog(char **args){
-	int i;
-	if (args[0]==NULL){
-		return 1; //empty command
-	}
-
-	for (i=0; i<builtin_len(); i++){
-		if (strcmp(args[0], builtin_cmds[i])==0){
-			return (*builtin_fn[i])(args);
+		else if (pid<0){
+			perror("ls");
 		}
+		else {
+			wait(NULL);
+			printf("Child exited");
+		}
+		//printf("%s", argv);
+		}
+
 	}
-	return launch_shell(args);
-}
-
-char *read_input(void){
-	char *line =NULL;
-	ssize_t buffsize=0;
-        getline(&line, &buffsize, stdin);
-	return line;
-}
-char **split_inputs(char *line){
-	char *token;
-        token= strtok(line, " ");
-        int i=0;
-	char* argc[100];
-
-        while (token!=NULL){
-		argc[i]=token;
-                token=strtok(NULL, " ");
-                i++;
-        }
-}
-
-void start_process(void){
-	char *line;
-	char **args;
-	int status;
-
-	do{
-		printf("wish> ");
-		line=read_input();
-		args=split_inputs(line);
-		status=exec_prog(args);
-
-		free(line);
-		free (args);
-	}
-	while(status);
-}
-
-int main (int argc, char **argv){
-
-	start_process();
-
-	return EXIT_SUCCESS;
-}
-
