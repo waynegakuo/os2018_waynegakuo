@@ -61,7 +61,8 @@ int main(int argc, char *argv[]){
 
 		else if (strcmp(comm[0], "ls")==0) {
 			printf ("here here");
-			char *arr[10]; //array for execv
+
+			char *arr[1024]; //array for execv
 			for (int i=1; i<11; i++){
 				arr[i]=NULL;
 			}
