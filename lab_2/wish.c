@@ -22,6 +22,17 @@ int main(int argc, char *argv[]){
 		if (line[new_ln]== '\n')
 			line[new_ln]='\0';
 	}
+
+    char* concat(const char *s1, const char *s2)
+    {
+        const size_t len1 = strlen(s1);
+        const size_t len2 = strlen(s2);
+        char *result = malloc(len1 + len2 + 1); // +1 for the null-terminator
+        // in real co de you would check for errors in malloc here
+        memcpy(result, s1, len1);
+        memcpy(result + len1, s2, len2 + 1); // +1 to copy the null-terminator
+        return result;
+    }
 	if (argc==1){
 
 	while(1){
@@ -46,7 +57,6 @@ int main(int argc, char *argv[]){
 
 
 
-		printf("Round two: %s\n", comm[0]);
  		if (strcmp(comm[0], "exit")==0){
 			exit(0);
 		}
@@ -59,43 +69,55 @@ int main(int argc, char *argv[]){
 		}
 
 
-		else if (strcmp(comm[0], "ls")==0) {
-			printf ("here here");
+		else {
 
 			char *arr[1024]; //array for execv
-			for (int i=1; i<11; i++){
+			for (int i=1; i<10; i++){
 				arr[i]=NULL;
 			}
+
+            int red= 0; //redirect check
+            char *fname; //filename
 			if (count>1){
 				for (int x=1; x<count; x++){
-					arr[x]=comm[x];
+                    if(strcmp(comm[x], ">")!=0){
+                        arr[x]=comm[x];
+                    }
+                    else{
+                            red = 1;
+                            x++;
+                            fname = comm[x];
+
+                        }
+					
 					}
 			}
-			printf("%s", comm[0]);
 
-			char *path1=strcat("/usr/bin/", comm[0]);
-			char *path2=strcat("/bin/", comm[0]);
-
+			char *path1=concat("/usr/bin/", comm[0]);
+			char *path2=concat("/bin/", comm[0]);
 			pid_t pid, wpid;
 			int status;
 
 			pid=fork();
-			if (pid=0){
+			if (pid==0){
 				if (access(path1, X_OK)==0){
 					arr[0]=path1;
 					execv(path1, arr);
 				}
 				else if(access(path2, X_OK)==0){
 					arr[0]=path2;
+
+                    if (red==1){
+                    FILE* file = fopen(fname, "w+");
+                    dup2(fileno(file), fileno(stdout));
+                    dup2(fileno(file), fileno(stderr));
+                    fclose(file);
+                }
 					execv(path2, arr);
 				}
 			}
-			else if (pid<0){
-				perror("ls");
-			}
 			else {
 				wait(NULL);
-				printf("Child exited\n");
 			}
 		}
 		//printf("%s", argv);
@@ -192,10 +214,5 @@ int main(int argc, char *argv[]){
         }
 fclose(fp);
 }
-
-	//batch mode
-//printf("batch mode \n");
-
 }
-
 

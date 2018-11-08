@@ -1,0 +1,5 @@
+batch.txt
+output.txt
+wayne.txt
+wish
+wish.c
