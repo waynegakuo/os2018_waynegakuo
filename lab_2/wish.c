@@ -2,217 +2,231 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <string.h>
 
 #define BUFF_SIZE 32
 
-int main(int argc, char *argv[]){
-	char *line;  //get command line
-    	char* comm[1024];        //user command
-    	char* path= "/bin/";    //set path at bin
-    	char progpath[20];      //full file path
-    	int count;               //arg count
-	size_t buffsize=32;
-	size_t characters;
-	char *com[1024];
+size_t buffsize=32;
+size_t characters;
+pid_t pid, wpid;
 
+char *progpath[20];      //full file path
+int path_counter=2; //path counter initially set to 2
+int path_active=0; //path active set to false
 
-	void rem_newline(char *line){
-		int new_ln=strlen(line)-1;
-		if (line[new_ln]== '\n')
-			line[new_ln]='\0';
-	}
+//removing new line character
+void rem_newline(char *line){
+  int ln=strlen(line)-1;
+  if (line[ln]== '\n')
+    line[ln]='\0';
+}
 
-    char* concat(const char *s1, const char *s2)
-    {
-        const size_t len1 = strlen(s1);
-        const size_t len2 = strlen(s2);
-        char *result = malloc(len1 + len2 + 1); // +1 for the null-terminator
-        // in real co de you would check for errors in malloc here
-        memcpy(result, s1, len1);
-        memcpy(result + len1, s2, len2 + 1); // +1 to copy the null-terminator
-        return result;
+//error message
+void error_msg (){
+  char error_message[30] = "An error has occurred\n";
+  write(STDERR_FILENO, error_message, strlen(error_message));
+}
+
+//function used for concatination of commands
+char* concat(const char *s1, const char *s2)
+{
+  const size_t len1 = strlen(s1);
+  const size_t len2 = strlen(s2);
+  char *result = malloc(len1 + len2 + 1);
+  memcpy(result, s1, len1);
+  memcpy(result + len1, s2, len2 + 1);
+  return result;
+}
+
+//this function executes users commands
+void *commandFunction(void *l){
+  if (path_active==0){
+    progpath[0]="/bin";
+    progpath[1]= "usr/bin";
+
+  }
+  char *token; //split commands
+  char *line= (char *)l;  //get command line
+  char *comm[1024]; //user commands array
+
+  rem_newline(line); //removes newline characters
+
+  token= strtok(line, " "); //first token
+
+  int i=0; //commands counter
+
+  //adding tokens to commands array
+  while (token!=NULL){
+    comm[i]=token;
+    token=strtok(NULL, " ");
+    i++;
+  }
+
+  if (strcmp(comm[0], "path")==0){ //checks if 1st argument provided is 'path'
+    path_counter=0;
+    path_active=1;
+    for (int m=1; m<i; m++){
+      progpath[m-1]=malloc(strlen(comm[m])+1);
+      strcpy(progpath[m-1], comm[m]);
+      path_counter++;
     }
-	if (argc==1){
+  }
 
-	while(1){
+  //exit function
+  else if (strcmp(comm[0], "exit")==0){
+    exit(0);
+  }
 
-    		printf("wish> ");
-		line=(char *)malloc(buffsize * sizeof(char));
-		getline(&line, &buffsize, stdin);
-		rem_newline(line);
+  //changing directory
+  else if (strcmp(comm[0], "cd")==0){
+    if(chdir(comm[1])==-1)
+      error_msg();
+    else
+      printf("Change directory successful \n");
+  }
 
-		char *token;
-                int argc; //taking argument count
-                token= strtok(line, " ");
-                int i=0;
-                char **argv= malloc (100 * sizeof(char*)); //storing tokens into array of pointers of pointers
-                while (token!=NULL){
-                        comm[i]=token;
-                        token=strtok(NULL, " ");
-                        i++;
-                }
-                //argv[i]=NULL;
-                count=i;
+  else {
 
+    char *arr[200]; //array for execv
+    for (int k=1;k<10; k++){
+      arr[k]=NULL;
+    }
 
-
- 		if (strcmp(comm[0], "exit")==0){
-			exit(0);
-		}
-
-		else if (strcmp(comm[0], "cd")==0){
-			if(chdir(comm[1])==-1)
-				printf("Please provide directory to move into \n");
-			else
-				printf("succeeded \n");
-		}
-
-
-		else {
-
-			char *arr[1024]; //array for execv
-			for (int i=1; i<10; i++){
-				arr[i]=NULL;
-			}
-
-            int red= 0; //redirect check
-            char *fname; //filename
-			if (count>1){
-				for (int x=1; x<count; x++){
-                    if(strcmp(comm[x], ">")!=0){
-                        arr[x]=comm[x];
-                    }
-                    else{
-                            red = 1;
-                            x++;
-                            fname = comm[x];
-
-                        }
-					
-					}
-			}
-
-			char *path1=concat("/usr/bin/", comm[0]);
-			char *path2=concat("/bin/", comm[0]);
-			pid_t pid, wpid;
-			int status;
-
-			pid=fork();
-			if (pid==0){
-				if (access(path1, X_OK)==0){
-					arr[0]=path1;
-					execv(path1, arr);
-				}
-				else if(access(path2, X_OK)==0){
-					arr[0]=path2;
-
-                    if (red==1){
-                    FILE* file = fopen(fname, "w+");
-                    dup2(fileno(file), fileno(stdout));
-                    dup2(fileno(file), fileno(stderr));
-                    fclose(file);
-                }
-					execv(path2, arr);
-				}
-			}
-			else {
-				wait(NULL);
-			}
-		}
-		//printf("%s", argv);
-	}
-}
-	else if(argc==2){
-		char ch;
-   		FILE *fp;
-
-   		fp = fopen(argv[1], "r"); // opens up a file
-
-
-   		if (fp == NULL)
-   				{
-      perror("Error while opening the file.\n");//error if file does not exist
-      exit(EXIT_FAILURE);
-   }
-
-   printf("Printing Contents:\n");
-
-   //prints content of file
-
-	while(getline(&line, &buffsize,fp) !=-1){
-                rem_newline(line);
-
-		char *token;
-                int argc; //taking argument count
-                token= strtok(line, " ");
-                int i=0;
-                char **argv= malloc (100 * sizeof(char*)); //storing tokens into array of pointers of pointers
-                while (token!=NULL){
-                        comm[i]=token;
-                        token=strtok(NULL, " ");
-                        i++;
-                }
-                //argv[i]=NULL;
-                count=i;
-
-                printf("Round two: %s\n", comm[0]);
-                if (strcmp(comm[0], "exit")==0){
-                        exit(0);
-                }
-
-                else if (strcmp(comm[0], "cd")==0){
-                        if(chdir(comm[1])==-1)
-                                printf("Please provide directory to move into \n");
-                        else
-                                printf("succeeded \n");
-                }
-                //for (i=0; i<argc; i++){
-                //      printf("%s\n", argv[i]);
-                //}
-
-                else if (strcmp(comm[0], "ls")==0) {
-                        printf ("here here");
-                        char *arr[10]; //array for execv
-                        for (int i=1; i<11; i++){
-                                arr[i]=NULL;
-                        }
-                        if (count>1){
-                                for (int x=1; x<count; x++){
-                                        arr[x]=comm[x];
-                                        }
-                        }
-                        printf("%s", comm[0]);
-
-                        char *path1=strcat("/usr/bin/", comm[0]);
-                        char *path2=strcat("/bin/", comm[0]);
-                        //com["/usr"]
- //printf("%s", argv[0]);
-                        pid_t pid, wpid;
-                        int status;
-
-                        pid=fork();
-                        if (pid=0){
-                                if (access(path1, X_OK)==0){
-                                        arr[0]=path1;
-                                        execv(path1, arr);
-                                }
-                                else if(access(path2, X_OK)==0){
-                                        arr[0]=path2;
-                                        execv(path2, arr);
-                                }
-                        }
-                        else if (pid<0){
-                                perror("ls");
-                        }
-                        else {
-                                wait(NULL);
-                                printf("Child exited\n");
-                        }
-                }
-                //printf("%s", argv);
+    int red= 0; //redirect check set to false
+    char *fname; //filename
+    if (i>1){
+      for (int x=1; x<i; x++){
+        if(strcmp(comm[x], ">")!=0){ //checks for redirection
+          arr[x]=comm[x];
         }
-fclose(fp);
-}
+        else{
+          red = 1; //if found redirection set to true
+          x++;
+          fname = comm[x];
+        }
+
+      }
+    }
+
+    //start process
+    pid=fork();
+    if (pid==0){
+      for (int j=0; j<path_counter; j++){
+        char *path1=concat("/usr/bin/", comm[0]);
+        char *path2=concat("/bin/", comm[0]);
+
+        if (access(path1, X_OK)==0){
+          arr[0]=path1;
+          execv(path1, arr);
+        }
+        else if(access(path2, X_OK)==0){
+          arr[0]=path2;
+
+          if (red==1){
+            FILE* file = fopen(fname, "w+");
+            dup2(fileno(file), fileno(stdout));
+            dup2(fileno(file), fileno(stderr));
+            fclose(file);
+          }
+          execv(path2, arr);
+        }
+      }
+      error_msg();
+    }
+    else {
+      wait(NULL);
+    }
+  }
 }
 
+//main function
+int main(int argc, char *argv[]){
+
+  FILE *fp;
+  char *line=NULL;  //get command line
+  size_t buffsize=32;
+
+  if (argc==1){
+
+
+    while(1){
+      printf("wish> ");
+      line=(char *)malloc(buffsize * sizeof(char));
+      getline(&line, &buffsize, stdin);
+
+      rem_newline(line);
+
+      //printf("Are we here yet?"); //confirm
+
+      char *comm[10];//user commands array
+      char *token; //split commands
+      int count=0;
+
+      token= strtok(line, "&");
+
+      //char **argv= malloc (100 * sizeof(char*)); //storing tokens into array of pointers of pointers
+      while (token!=NULL){
+        comm[count]=token;
+        token=strtok(NULL, "&");
+        count++;
+      }
+
+      int l,m;
+      pthread_t thread_new[count];
+
+      for (l=0; l<count; l++){
+        pthread_create(&thread_new[l], NULL, commandFunction, comm[l]);
+      }
+
+      for (m=0; m<count; m++){
+        pthread_join(thread_new[m], NULL);
+      }
+    }
+  }
+
+  else if(argc==2){
+    fp = fopen(argv[1], "r"); // opens up a file
+    if (fp == NULL)
+    {
+      perror("Error while opening file.\n");//error if file does not exist
+      exit(EXIT_FAILURE);
+    }
+
+    printf("Printing Contents:\n");
+
+    //prints content of file
+
+    while(getline(&line, &buffsize,fp) !=-1){
+      rem_newline(line);
+
+      char* comm[1024];//user commands array
+      char *token; //split commands
+      int count=0;
+
+      token= strtok(line, "&");
+      char **argv= malloc (100 * sizeof(char*)); //storing tokens into array of pointers of pointers
+      while (token!=NULL){
+        comm[count]=token;
+        token=strtok(NULL, "&");
+        count++;
+      }
+      //argv[i]=NULL;
+
+      // printf("Round two: %s\n", comm[0]);
+      int l,m;
+
+      pthread_t thread_new_2[count];
+      for (l=0; l<count; l++){
+        pthread_create(&thread_new_2[l], NULL, commandFunction, comm[l]);
+      }
+      for (m=0; m<count; m++){
+        pthread_join(thread_new_2[m], NULL);
+      }
+    }
+  }
+  else{
+    printf("%s\n", "Two arguments allowed");
+  }
+  return 0;
+}
